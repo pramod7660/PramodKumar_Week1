@@ -1,0 +1,27 @@
+--  Show department name, employee count, average, minimum and maximum salary. Include departments with no employees.
+
+select d.dept_name, count(e.emp_id)as count, avg(e.salary)as avg_salary, min(e.salary)as min_salary, max(e.salary)as max_salary from Departments d left join Employees e on d.dept_id=e.dept_id group by d.dept_id,d.dept_name order by d.dept_id;
+
+--  Employees Above Department Average
+select e.emp_id,e.emp_name,e.dept_id,e.salary from Employees e where e.salary>(select avg(e2.salary) from Employees e2 where e2.dept_id=e.dept_id);
+
+--  Manager vs Team Salary
+select m.emp_id,m.emp_name,m.salary manager_salary,count(e.emp_id) report_count,sum(e.salary) team_salary from Employees m join Employees e on m.emp_id=e.manager_id group by m.emp_id,m.emp_name,m.salary having count(e.emp_id)>=2;
+
+--  Top Project Contributors
+with r as (select ep.project_id,ep.emp_id,e.emp_name,ep.hours_worked,dense_rank() over(partition by ep.project_id order by ep.hours_worked desc) rn from EmployeeProjects ep join Employees e on ep.emp_id=e.emp_id) select * from r where rn<=2;
+
+--  Departments Without Active Projects
+select d.dept_id,d.dept_name from Departments d join Employees e on d.dept_id=e.dept_id left join Projects p on d.dept_id=p.dept_id where p.project_id is null group by d.dept_id,d.dept_name;
+
+--  Running Order Revenue
+with r as (select order_date,sum(amount) daily_revenue from Orders where status='COMPLETED' group by order_date) select order_date,daily_revenue,sum(daily_revenue) over(order by order_date) cumulative_revenue from r;
+
+--  Customer Order Classification
+select customer_id,sum(amount) total_value,case when sum(amount)>=100000 then 'PLATINUM' when sum(amount)>=50000 then 'GOLD' when sum(amount)>=20000 then 'SILVER' else 'BRONZE' end classification from Orders where status='COMPLETED' group by customer_id;
+
+--  Consecutive Monthly Orders
+with m as (select distinct customer_id,date_format(order_date,'%Y-%m-01') month from Orders),r as (select *,lag(month) over(partition by customer_id order by month) p1,lag(month,2) over(partition by customer_id order by month) p2 from m) select distinct customer_id from r where month=date_add(p1,interval 1 month) and p1=date_add(p2,interval 1 month);
+
+--  Salary Gap Analysis
+with r as (select e.*,d.dept_name,max(salary) over(partition by e.dept_id) high,min(salary) over(partition by e.dept_id) low from Employees e join Departments d on e.dept_id=d.dept_id) select dept_id,dept_name,emp_id,emp_name,salary,high,low,high-low salary_gap from r where salary=high or salary=low;
